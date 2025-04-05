@@ -1,12 +1,11 @@
 import random
 
-from BaseClasses import get_seed
-from .. import SVTestBase, SVTestCase, allsanity_no_mods_6_x_x, allsanity_mods_6_x_x, solo_multiworld, \
-    fill_dataclass_with_default
+from BaseClasses import get_seed, ItemClassification
+from .. import SVTestBase, SVTestCase
 from ..assertion import ModAssertMixin, WorldAssertMixin
-from ... import items, Group, ItemClassification, create_content
-from ... import options
-from ...items import items_by_group
+from ..options.presets import allsanity_mods_6_x_x
+from ..options.utils import fill_dataclass_with_default
+from ... import options, items, Group, create_content
 from ...mods.mod_data import ModNames
 from ...options import SkillProgression, Walnutsanity
 from ...options.options import all_mods
@@ -192,17 +191,15 @@ class TestModEntranceRando(SVTestCase):
                                  f"Connections are duplicated in randomization.")
 
 
-class TestModTraps(SVTestCase):
-    def test_given_traps_when_generate_then_all_traps_in_pool(self):
-        for value in options.TrapItems.options:
-            if value == "no_traps":
-                continue
+class TestVanillaLogicAlternativeWhenQuestsAreNotRandomized(WorldAssertMixin, SVTestBase):
+    """We often forget to add an alternative rule that works when quests are not randomized. When this happens, some
+    Location are not reachable because they depend on items that are only added to the pool when quests are randomized.
+    """
+    options = allsanity_mods_6_x_x() | {
+        options.QuestLocations.internal_name: options.QuestLocations.special_range_names["none"],
+        options.Goal.internal_name: options.Goal.option_perfection,
+    }
 
-            world_options = allsanity_no_mods_6_x_x()
-            world_options.update({options.TrapItems.internal_name: options.TrapItems.options[value], options.Mods.internal_name: "Magic"})
-            with solo_multiworld(world_options) as (multi_world, _):
-                trap_items = [item_data.name for item_data in items_by_group[Group.TRAP] if Group.DEPRECATED not in item_data.groups]
-                multiworld_items = [item.name for item in multi_world.get_items()]
-                for item in trap_items:
-                    with self.subTest(f"Option: {value}, Item: {item}"):
-                        self.assertIn(item, multiworld_items)
+    def test_given_no_quest_all_mods_when_generate_then_can_reach_everything(self):
+        self.collect_everything()
+        self.assert_can_reach_everything(self.multiworld)
